@@ -1,0 +1,14 @@
+26.03
+-depth
+
+-url "",""
+
+-cos
+
+16.04
+3.
+-graph(linki zewnêtrzne-graph)
+
+-pr (wyliczyæ ranking)
+
+dr.£aski
