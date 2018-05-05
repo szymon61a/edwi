@@ -66,7 +66,7 @@ def convertnumpy(mainWeb, lista):
                         webValue.append(1)
                     else:
                         webValue.append(0)
-            div = len(web.url)
+            div = sum(webValue)
             if(div==0):
                 div=1
             webValue = [x / div for x in webValue]

@@ -1,23 +1,23 @@
-import collections
 import http
 import re
 import socket
 import sys
 from urllib import request, error
 from urllib.parse import urlparse
-
+import urllib
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas
-# import requests
-# from HtmlParser import ParserHTML
 from bs4 import BeautifulSoup
 from pattern3.web import URL, HTTP404NotFound, URLError
 from scipy import spatial
 from scipy.sparse import csc_matrix
 
+from Mongo import Mongo
 from WebSite import WebSite, converttonumpy, convertnumpy, printTemp
+
+mongo = Mongo()
 
 
 def downloadWebSite(url):
@@ -31,11 +31,12 @@ def downloadWebSite(url):
         return ""
 
 
+
 def getTextWebsite(page):
     soup = BeautifulSoup(page, 'html.parser')
     [s.extract() for s in soup(['style', '[document]', 'script', 'head', 'title'])]
     text = re.sub(r'[\s\t\n\r@.\-,.@#$%^&*()+/<>?!`:;0-9\']', ' ', soup.text)
-    test = re.findall(r'\b[^\d\W]+\b', soup.text)
+    test = re.findall(r'\b[^\d\W]+\b', text)
     dic = {i: test.count(i) for i in test}
     sort_dic = [(k, dic[k]) for k in sorted(dic, key=dic.get, reverse=True)]
     return sort_dic
@@ -199,10 +200,11 @@ def allfunction(flags, url, flag=None):
             # test = collections.Counter(array)
             object = convertnumpy(array[1], array[0])
             numpy = np.array(object)
-            # numpy=np.transpose(numpy)
-            rank=executeComputations(numpy)
+            numpy = np.transpose(numpy)
+            rank = executeComputations(numpy)
             # rank=pageRank(numpy, s=.86)
             printTemp(array[0], rank)
+            push(rank, array[0])
             allfunction(flags[y + 1::], url, flag)
 
         if (flags[y] == "-deapth"):
@@ -226,7 +228,22 @@ def allfunction(flags, url, flag=None):
     return text
 
 
-def executeComputations( M):
+def push(rank, webs):
+    for x in range(len(webs)):
+        try:
+            page = downloadWebSite(webs[x])
+            soup = BeautifulSoup(page, 'html.parser')
+            [s.extract() for s in soup(['style', '[document]', 'script', 'head', 'title'])]
+            text = re.sub(r'[\s\t\n\r@.\-,.@#$%^&*()+/<>?!`:;0-9\']', ' ', soup.text)
+            test = re.findall(r'\b[^\d\W]+\b', text)
+            text=""
+            for t in test:
+                text+=t+" "
+            mongo.pushText(webs[x], text, rank.item(x))
+        except urllib.error.URLError:
+            t=""
+
+def executeComputations(M):
     damping = 0.80
     error = 0.0000001
     N = M.shape[0]
@@ -235,7 +252,7 @@ def executeComputations( M):
     last_v = np.full(N, np.finfo(float).max)
     for i in range(0, N):
         try:
-            temp=M[:,i]
+            temp = M[:, i]
             if sum(temp) == 0:
                 M[:, i] = np.full(N, 1.0 / N)
         except IndexError:
@@ -247,6 +264,7 @@ def executeComputations( M):
         v = np.matmul(M_hat, v)
 
     return np.round(v, 6)
+
 
 def do(mainWeb, deapth, counter):
     mList = []
@@ -271,14 +289,9 @@ def printGraph(mainWeb, deapth, counter):
         mTo.append(object[1])
 
     df = pandas.DataFrame({'from': mFrom, 'to': mTo})
-    G = nx.from_pandas_edgelist(df, 'from', 'to', create_using=nx.DiGraph())
-    # nx.draw(G,with_labels=True,node_size=1000,alpha=0.3,node_color="skyblue",arrows=True,pos=nx.spectral_layout(G))
-    # plt.show()
     G1 = nx.from_pandas_edgelist(df, 'from', 'to')
-    # pos = nx.spring_layout(G1, iterations=1000)
-    # pos = nx.spectral_layout(G1)
     pos = nx.spring_layout(G1)
-    nx.draw_networkx(G1, pos, node_size=200, alpha=0.4, edge_color='r', font_size=8, with_labels=True, arrows=True,)
+    nx.draw_networkx(G1, pos, node_size=200, alpha=0.4, edge_color='r', font_size=8, with_labels=True, arrows=True, )
     plt.show()
 
 
@@ -367,11 +380,21 @@ def main(arg):
             for url in urls:
                 print(url)
                 print(allfunction(arg[count::], url, arg))
-
-
+    else:
+        # mongo.prepare_search()
+        if arg[count] == "-search":
+            count += 1
+            t=""
+            for x in arg[count:]:
+                t+=x
+                t+=" "
+            print(t[:-1:])
+            mongo.search(t)
 # if(arg[count]=="-file"):
 #     print()
 
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
+
